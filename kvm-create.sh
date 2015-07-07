@@ -53,7 +53,7 @@ function argvs_check() {
 #check the interface
 	if ! service libvirtd status &>/dev/null;then
 		service libvirtd restart &>/dev/null
-		[ $? -ne "0" ] && echo "Service libvirtd is not running,please start it"
+		[ $? -ne "0" ] && echo "Service libvirtd is not running,please install it or start it"
 		exit
 	else
 		if brctl show | awk 'NR>1 && /^[^\t]/{print $1}' | grep "${interface}" &>/dev/null;then
