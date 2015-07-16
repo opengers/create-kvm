@@ -1,12 +1,12 @@
 #centos6.x下批量创建KVM虚拟机脚本
 ##说明
-更新日期:2015-7-16.
-版本:2.0
-作者:www.isjian.com
-Version 2.0 ChangeLog:
---修复一些bugs
---创建虚拟机之前，增加变量检查
---支持设置虚拟机IP地址
+- 更新日期:2015-7-16.
+- 版本:2.0
+- 作者:www.isjian.com
+- Version 2.0 ChangeLog:
+- --修复一些bugs
+- --创建虚拟机之前，增加变量检查
+- --支持设置虚拟机IP地址
 
 ##注意:
 - 如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式
