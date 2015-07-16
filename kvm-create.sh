@@ -1,41 +1,62 @@
 #!/bin/bash
-#Time:2015-7-2
+#Time:2015-7-16
 #Note:create the VMs accroding to the settings
-#Version:1.5
-#Author:plcloud.lijian
+#Version:2.0
+#Author:www.isjian.com
+#Version 2.0 ChangeLog:
+#--fix some bugs
+#--add the variables check before create the vms
+#--Set the vms ip before create the vms
 
-#----------------------- argvs ----------------------
+#------------------------ argvs ---------------------------
 
 #虚拟机个数
-nums=3
+nums=2
 #如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式
 vmname="x3"
 #虚拟机磁盘大小(单位为G),默认为20G
 vdisksize=20
 #虚拟磁盘存放目录
-vdiskdir=/data/vhosts/jython/x3
+vdiskdir=/data/vhosts/x3
 
 #如果需要从某个已有镜像克隆虚拟机，则设置镜像路径，要检查此镜像可用，并且路径正确，负责虚拟机会创建失败
 #如果需要新建空白磁盘，则设置此项为空
-vbacking="/data/images/centos65x64.qcow2"
+vbacking="/data/images/centos65x64-2.6kernel.qcow2"
 #虚拟机CPU个数
 vcpu=1
 #虚拟机内存(G)
-vmemory=2
+vmemory=1
+#虚拟机网卡个数设置
+nicnums="2"
 #虚拟机网络"virbr0"为nat方式，要使用桥接方式，请改为桥接网卡名，比如br-ex,要确保此网桥可用
 interface="br-ex"
-#虚拟机网卡个数设置
-nicnums="4"
 
-#-----------------------------------------------------
+#--------------虚拟机网络设置-----------------
+#是否设置虚拟机ip地址("y" or "n")
+ipalter="y"
+
+#注意：以下变量仅在ipalter设置为"y"时生效-----
+#虚拟机ip获取方式，dhcp，或者static
+nettype=static
+#如果手工设置网络，则需要设置以下信息,ip地址数必须与创建的虚拟机个数匹配,中间必须用空格隔开
+vmipaddr="172.16.12.56 172.16.12.57"
+vmnetmask="255.255.255.0"
+vmgateway="172.16.12.254"
+
+#-----------------------------------------------------------
 
 function argvs_check() {
-#check the vmname
-	for i in `seq 1 ${nums}`;do
+#check the variable nums
+	if ! test ${nums} -ge 1 2>/dev/null;then
+		echo "Error! --The number of vm ${nums} set error!"
+		exit 3
+	fi
+
+	for k in `seq 1 ${nums}`;do
 		vname="${vmname}-${i}"
 		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" >/dev/null;then
-			echo "error,the vhost ${vname} already exist!"
-			exit
+			echo "Error! --The vm ${vname} already exist!"
+			exit 2
 		fi
 	done
 
@@ -46,34 +67,71 @@ function argvs_check() {
 
 #check the diskdir exist
 	if [ ! -d "${vdiskdir}" ];then
-		echo "the dir ${vdiskdir} is not exist"
-		exit
+		echo "Error! --The dir ${vdiskdir} is not exist"
+		exit 4
+	fi
+
+#check the backing file exist	
+	if [ ! -f "${vbacking}" ];then
+		echo "Error! --The backing file ${vbacking} not exist"
+		exit 5
 	fi
 
 #check the interface
 	if ! service libvirtd status &>/dev/null;then
 		service libvirtd restart &>/dev/null
-		[ $? -ne "0" ] && echo "Service libvirtd is not running,please install it or start it"
-		exit
+		[ $? -ne "0" ] && echo "Error! --Service libvirtd is not running,please install it or start it"
+		exit 4
 	else
 		if brctl show | awk 'NR>1 && /^[^\t]/{print $1}' | grep "${interface}" &>/dev/null;then
 			ipaddr=$(ifconfig "${interface}" | awk '/inet addr/{print substr($2,6)}')	
 			if ! ping -w 3 "${ipaddr}" &>/dev/null;then
-				echo "error,the bridge ${interface} need a ip address"
+				echo "Error! --The bridge ${interface} need a ip address"
+				exit 6
 			fi
 		else
-			echo "error,${interface} is not a bridge"
+			echo "Error! --The ${interface} is not a bridge"
 			exit
+		fi
+	fi
+
+#check the vmipaddr
+	if [ "${ipalter}" != "y" ] && [ "${ipalter}" != "n" ];then
+		echo "Error! --Set the variable ipalter to 'y' or 'n'"
+		exit 2
+	fi
+
+#when set the ip addr,Check the following options
+	if [ "${ipalter}" == "y" ];then
+	
+		ipnums=`echo "${vmipaddr}" | awk '{print NF}'`
+		if [ "${ipnums}" -ne "${nums}" ];then
+			echo "Error! --The number of vm are:${nums},but the number of ip are:${ipnums},Both of them must be equal!"
+			exit 7
+		fi
+
+		if [ "${nettype}" == "dhcp" ];then
+			echo "dhcp set ok"
+		elif [ "${nettype}" == "static" ];then
+			[ -z "${vmipaddr}" ] && echo "Error! --you must set the vm ip address!" && exit 2
+			[ -z "${vmnetmask}" ] && echo "Error! --you must set the vm netmask!" && exit 2
+			[ -z "${vmgateway}" ] && echo "Error! --you must set the vm gateway!" && exit 2
+		else
+			echo "Error! --set the variable nettype to 'dhcp' or 'static'"
+			exit 6
+		fi
+
+		if ! which "virt-copy-in" &>/dev/null;then
+			echo "Error! --The virt-copy-in tools not install,please install via 'yum install libguestfs libguestfs-tools-c'"
+			exit 8
 		fi
 	fi
 }
 
 function create_disk() {
-	if [ -n "${vbacking}" ];then
-		qemu-img create -b "${vbacking}" -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G
-	else
-		qemu-img create -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G
-	fi
+	echo "++++++++"
+	qemu-img create -b "${vbacking}" -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G &>/dev/null
+	echo "create ${vdiskdir}/${vname}.disk OK!"
 }	
 
 function create_xml() {
@@ -93,11 +151,50 @@ function create_xml() {
 	fi
 
 	sed -i "s/thisisnetwork/${interface}/g" ${vname}.xml
+
+	virsh define ${vname}.xml &>/dev/null
+	echo "define ${vname} OK!"
+}
+
+function create_ipaddr() {
+	if [ "${ipalter}" == "y" ];then
+		echo "Set the ${vname} ip address..."
+		rm -fr ifcfg-eth0
+		macaddr=`virsh domiflist ${vname} | awk 'NR==3{print $5}'`
+		if [ "${nettype}" == "static" ];then
+			eth0ip=`echo $vmipaddr | awk -v i=${i} '{print $i}'`
+			cat > ifcfg-eth0 <<- EOF
+			DEVICE=eth0
+			HWADDR=${macaddr}
+			TYPE=Ethernet
+			ONBOOT=yes
+			NM_CONTROLLED=no
+			BOOTPROTO=static
+			IPADDR=${eth0ip}
+			NETMASK=${vmnetmask}
+			GATEWAY=${vmgateway}
+			DNS1=223.5.5.5
+			DNS2=223.6.6.6
+			EOF
+		elif [ "${nettype}" == "dhcp" ];then
+			cat > ifcfg-eth0 <<- EOF
+			DEVICE=eth0
+			HWADDR=${macaddr}
+			TYPE=Ethernet
+			ONBOOT=yes
+			NM_CONTROLLED=no
+			BOOTPROTO=dhcp
+			EOF
+		fi
+
+		sed -r -i "s/^( |\t)*//g" ifcfg-eth0
+		virt-copy-in -a ${vdiskdir}/${vname}.disk ifcfg-eth0 /etc/sysconfig/network-scripts/
+		echo "Set the ${vname} ip address OK!"
+		rm -fr ifcfg-eth0
+	fi
 }
 
 function start_domin() {
-	cd ${vdiskdir}
-	virsh define ${vname}.xml
 	virsh start ${vname}
 }
 
@@ -143,7 +240,7 @@ cat >> ${vdiskdir}/base.xml << 'EOF'
     </controller>
 EOF
 
-for i in `seq 1 ${nicnums}`;do
+for j in `seq 1 ${nicnums}`;do
 cat >> ${vdiskdir}/base.xml << 'EOF'
     <interface type='bridge'>
       <source bridge='thisisnetwork'/>
@@ -179,7 +276,7 @@ function main() {
 		create_disk
 		set_basexml
 		create_xml
-		create_disk
+		create_ipaddr
 		start_domin
 	done
 }
