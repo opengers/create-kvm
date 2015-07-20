@@ -1,47 +1,47 @@
 #!/bin/bash
 #Time:2015-7-16
-#Note:create the VMs accroding to the settings
+#Note:Create the VMs accroding to the settings
 #Version:2.0
 #Author:www.isjian.com
 #Version 2.0 ChangeLog:
-#--fix some bugs
-#--add the variables check before create the vms
+#--Fix some bugs
+#--Add the variables check before create the vms
 #--Set the vms ip before create the vms
 
 #------------------------ argvs ---------------------------
 
 #虚拟机个数
 nums=2
-#如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式
+#虚拟机名字，如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式
 vmname="x3"
 #虚拟机磁盘大小(单位为G),默认为20G
 vdisksize=20
 #虚拟磁盘存放目录
 vdiskdir=/data/vhosts/x3
 
-#如果需要从某个已有镜像克隆虚拟机，则设置镜像路径，要检查此镜像可用，并且路径正确，负责虚拟机会创建失败
-#如果需要新建空白磁盘，则设置此项为空
+#vbacking设置虚拟机所使用的模板镜像，此项是必要的，请确保此处设置的镜像可用，负责虚拟机会创建失败
 vbacking="/data/images/centos65x64-2.6kernel.qcow2"
-#虚拟机CPU个数
+#虚拟机核数(正整数)
 vcpu=1
 #虚拟机内存(G)
 vmemory=1
-#虚拟机网卡个数设置
+#虚拟机网卡个数
 nicnums="2"
-#虚拟机网络"virbr0"为nat方式，要使用桥接方式，请改为桥接网卡名，比如br-ex,要确保此网桥可用
+#虚拟机网络配置方式，"virbr0"为nat方式，要使用桥接，请改为桥接网卡名，比如br-ex,请确保此网桥可用
 interface="br-ex"
 
-#--------------虚拟机网络设置-----------------
 #是否设置虚拟机ip地址("y" or "n")
 ipalter="y"
 
-#注意：以下变量仅在ipalter设置为"y"时生效-----
-#虚拟机ip获取方式，dhcp，或者static
+#注意：以下变量仅在ipalter设置为"y"时生效
+#############################################
+#虚拟机ip获取方式("dhcp" or "static")
 nettype=static
-#如果手工设置网络，则需要设置以下信息,ip地址数必须与创建的虚拟机个数匹配,中间必须用空格隔开
+#如果nettype使用static方式，则需要设置以下信息,ip地址数必须与创建的虚拟机个数匹配,中间须用空格隔开
 vmipaddr="172.16.12.56 172.16.12.57"
 vmnetmask="255.255.255.0"
 vmgateway="172.16.12.254"
+#############################################
 
 #-----------------------------------------------------------
 
