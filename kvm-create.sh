@@ -1,8 +1,11 @@
 #!/bin/bash
 #Time:2015-7-16
 #Note:Create the VMs accroding to the settings
-#Version:2.0
+#Version:2.0.1
 #Author:www.isjian.com
+#Version 2.0.1 ChangeLog:
+#--vmname 变量只能为字母数字，下划线
+#--virsh 命令存在检查
 #Version 2.0 ChangeLog:
 #--Fix some bugs
 #--Add the variables check before create the vms
