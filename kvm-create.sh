@@ -6,6 +6,8 @@
 #Version 2.0.1 ChangeLog:
 #--vmname 变量只能为字母数字，下划线
 #--virsh 命令存在检查
+#--创建前检查虚拟磁盘是否存在
+
 #Version 2.0 ChangeLog:
 #--Fix some bugs
 #--Add the variables check before create the vms
@@ -76,7 +78,7 @@ function argvs_check() {
 		fi
 
 		if ls ${vdiskdir}/${vname}.disk &>/dev/null;then
-			echo "The disk ${vdiskdir}/${vname}.disk already exist!"
+			echo "Error! --The disk ${vdiskdir}/${vname}.disk already exist!"
 			exit 2
 		fi
 	done
