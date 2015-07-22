@@ -12,9 +12,9 @@
 
 #虚拟机数量
 nums=2
-#虚拟机名字，如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式
+#虚拟机名字，如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式,该变量只能为数字，字母下划线
 vmname="x3"
-#虚拟机磁盘大小(单位为G),默认为20G
+#虚拟机磁盘大小(单位为G),默认为20G,最小4G
 vdisksize=20
 #虚拟磁盘存放目录
 vdiskdir=/data/vhosts/x3
@@ -52,10 +52,28 @@ function argvs_check() {
 		exit 3
 	fi
 
+#check the virsh command 
+	if ! which virsh &>/dev/null;then
+		echo "Error! --the libvirt is not install,please install via:yum install libvirt-client libvirt"
+		exit 2
+	fi
+
+#check the vmname 
+	if ! echo "${vmname}" | grep -E "^\w+$" &>/dev/null;then
+		echo "Error! --The name ${vmname} is illegal"
+		exit 2
+	fi
+
+#check the vmname and vmdisk exists
 	for k in `seq 1 ${nums}`;do
 		vname="${vmname}-${i}"
-		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" >/dev/null;then
+		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" &>/dev/null;then
 			echo "Error! --The vm ${vname} already exist!"
+			exit 2
+		fi
+
+		if ls ${vdiskdir}/${vname}.disk &>/dev/null;then
+			echo "The disk ${vdiskdir}/${vname}.disk already exist!"
 			exit 2
 		fi
 	done
@@ -131,6 +149,10 @@ function argvs_check() {
 function create_disk() {
 	echo "++++++++"
 	qemu-img create -b "${vbacking}" -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G &>/dev/null
+	if [ "$?" -ne "0" ];then
+		echo "create ${vdiskdir}/${vname}.disk OK!"
+		exit 4
+	fi 
 	echo "create ${vdiskdir}/${vname}.disk OK!"
 }	
 
