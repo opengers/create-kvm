@@ -24,7 +24,7 @@ vdisksize=20
 #虚拟磁盘存放目录
 vdiskdir=/data/vhosts/x3
 
-#vbacking设置虚拟机所使用的模板镜像，此项是必要的，请确保此处设置的镜像可用，负责虚拟机会创建失败
+#vbacking设置虚拟机所使用的模板镜像，此项是必要的，请确保此处设置的镜像可用，否则虚拟机会创建失败
 vbacking="/data/images/centos65x64-2.6kernel.qcow2"
 #虚拟机核数(正整数)
 vcpu=1
