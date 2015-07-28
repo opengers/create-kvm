@@ -106,7 +106,7 @@ function argvs_check() {
 		[ $? -ne "0" ] && echo "Error! --Service libvirtd is not running,please install it or start it"
 		exit 4
 	else
-		if brctl show | awk 'NR>1 && /^[^\t]/{print $1}' | grep "${interface}" &>/dev/null;then
+		if brctl show | awk 'NR>1 && /^[^\t ]/{print $1}' | grep "${interface}" &>/dev/null;then
 			ipaddr=$(ifconfig "${interface}" | awk '/inet addr/{print substr($2,6)}')	
 			if ! ping -w 3 "${ipaddr}" &>/dev/null;then
 				echo "Error! --The bridge ${interface} need a ip address"
