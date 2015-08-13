@@ -1,13 +1,15 @@
 #centos6.x下批量创建KVM虚拟机脚本
 ##说明
-- 更新日期:2015-7-22.
-- 版本:2.0.1
+- 更新日期:2015-8-13
+- 版本:2.0.2
 - 作者:www.isjian.com
+
+- Version 2.0.2 ChangeLOg:
+- --只允许root用户执行此脚本
 - Version 2.0.1 ChangeLog:
 - --vmname 变量只能为字母数字，下划线
 - --virsh 命令存在检查
 - --创建前检查虚拟磁盘是否存在
-
 - Version 2.0 ChangeLog:
 - --修复一些bugs
 - --创建虚拟机之前，增加变量检查
