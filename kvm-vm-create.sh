@@ -1,13 +1,15 @@
 #!/bin/bash
 #Time:2015-7-16
 #Note:Create the VMs accroding to the settings
-#Version:2.0.1
+#Version:2.0.2
 #Author:www.isjian.com
+
+#Version 2.0.2 ChangeLog:
+#--添加身份检查，只允许root身份执行
 #Version 2.0.1 ChangeLog:
 #--vmname 变量只能为字母数字，下划线
 #--virsh 命令存在检查
 #--创建前检查虚拟磁盘是否存在
-
 #Version 2.0 ChangeLog:
 #--Fix some bugs
 #--Add the variables check before create the vms
@@ -296,7 +298,6 @@ cat >> ${vdiskdir}/base.xml << 'EOF'
 EOF
 }
 
-#main 
 function main() {
 	for i in `seq 1 ${nums}`;do
 		vname="${vmname}-${i}"
@@ -308,5 +309,10 @@ function main() {
 	done
 }
 
+#check the user 
+if [ `whoami` != root ]; then
+	echo "Error! --you must login in as root"
+	exit
+fi
 argvs_check
 main
