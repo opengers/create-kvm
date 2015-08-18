@@ -73,7 +73,7 @@ function argvs_check() {
 
 #check the vmname and vmdisk exists
 	for k in `seq 1 ${nums}`;do
-		vname="${vmname}-${i}"
+		vname="${vmname}-${k}"
 		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" &>/dev/null;then
 			echo "Error! --The vm ${vname} already exist!"
 			exit 2
