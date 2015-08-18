@@ -1,5 +1,5 @@
 #!/bin/bash
-#Time:2015-7-16
+#Date:2015-8-18
 #Note:Create the VMs accroding to the settings
 #Version:2.0.3
 #Author:www.isjian.com
