@@ -6,7 +6,7 @@
 
 - Version 2.0.3 ChangeLog:
 - 自定义虚拟机起始编号，vmhost-n,vmhost-{n+1},...
-- Version 2.0.2 ChangeLOg:
+- Version 2.0.2 ChangeLog:
 - --只允许root用户执行此脚本
 - Version 2.0.1 ChangeLog:
 - --vmname 变量只能为字母数字，下划线
