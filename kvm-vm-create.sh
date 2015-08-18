@@ -1,9 +1,11 @@
 #!/bin/bash
 #Time:2015-7-16
 #Note:Create the VMs accroding to the settings
-#Version:2.0.2
+#Version:2.0.3
 #Author:www.isjian.com
 
+#Version 2.0.3 ChangeLog:
+#--自定义虚拟机名称编号，vmhost-n,vmhost-{n+1},...
 #Version 2.0.2 ChangeLog:
 #--添加身份检查，只允许root身份执行
 #Version 2.0.1 ChangeLog:
@@ -17,24 +19,28 @@
 
 #------------------------ argvs ---------------------------
 
-#虚拟机数量
+#虚拟机数量(正整数)
 nums=2
-#虚拟机名字，如果创建多个虚拟机,虚拟机将被命名方式为vmhost-1,vmhost-2,vmhost-n 形式,该变量只能为数字，字母下划线
-vmname="x3"
-#虚拟机磁盘大小(单位为G),默认为20G,最小4G
-vdisksize=20
-#虚拟磁盘存放目录
-vdiskdir=/data/vhosts/x3
+#虚拟机初始编号,例如初始编号为3,则虚拟命名为vmhost-3,vmhost-4,vmhost-5,默认编号从1开始(正整数)
+startnum=2
+#虚拟机名字,该变量只能为(数字，字母下划线的组合)
+vmname="test"
+#虚拟磁盘存放目录(目录路径最后不需要带"/")
+vdiskdir=/data/vhosts/test
+#backing_image设置虚拟机的模板镜像，此项是必要的，请确保此处设置的镜像可用，负责虚拟机会创建失败
+backing_image="/data/images/centos65x64-2.6kernel.qcow2"
 
-#vbacking设置虚拟机所使用的模板镜像，此项是必要的，请确保此处设置的镜像可用，否则虚拟机会创建失败
-vbacking="/data/images/centos65x64-2.6kernel.qcow2"
-#虚拟机核数(正整数)
+#虚拟机CPU数(正整数,默认1)
 vcpu=1
-#虚拟机内存(G)
+#虚拟机内存(G,默认1)
 vmemory=1
-#虚拟机网卡个数
+#虚拟机磁盘大小(单位为G),默认为20G
+vdisksize=40
+#虚拟机网卡个数(默认2)
 nicnums="2"
-#虚拟机网络配置方式，"virbr0"为nat方式，要使用桥接，请改为桥接网卡名，比如br-ex,请确保此网桥可用
+#虚拟机网络配置方式，可以使用nat，或者桥接方式
+#--nat方式: 虚拟机通过nat方式访问外网,virbr0为libvirt自动创建，默认使用192.168.122.0/24这个网段
+#--桥接方式: 要使用桥接方式访问外网,请改为宿主机上的某个网桥,比如br-ex,请确保此网桥可用(支持Linux Bridge,暂不支持OVS)
 interface="br-ex"
 
 #是否设置虚拟机ip地址("y" or "n")
@@ -45,7 +51,7 @@ ipalter="y"
 #虚拟机ip获取方式("dhcp" or "static")
 nettype=static
 #如果nettype使用static方式，则需要设置以下信息,ip地址数必须与创建的虚拟机个数匹配,中间须用空格隔开
-vmipaddr="172.16.12.56 172.16.12.57"
+vmipaddr="172.16.12.61 172.16.12.62"
 vmnetmask="255.255.255.0"
 vmgateway="172.16.12.254"
 #############################################
@@ -53,42 +59,29 @@ vmgateway="172.16.12.254"
 #-----------------------------------------------------------
 
 function argvs_check() {
-#check the variable nums
-	if ! test ${nums} -ge 1 2>/dev/null;then
-		echo "Error! --The number of vm ${nums} set error!"
+#check the var nums
+	if ! test "${nums}" -ge 1 2>/dev/null;then
+		echo "Error! --The nums set error!"
+		exit 3
+	fi
+
+#check the var startnum
+	if ! test "${startnum}" -ge 1 2>/dev/null;then
+		echo "Error! --The startnum set error!"
 		exit 3
 	fi
 
 #check the virsh command 
 	if ! which virsh &>/dev/null;then
-		echo "Error! --the libvirt is not install,please install via:yum install libvirt-client libvirt"
+		echo "Error! --the libvirt is not install,please install it via:yum install libvirt-client libvirt"
 		exit 2
 	fi
 
 #check the vmname 
 	if ! echo "${vmname}" | grep -E "^\w+$" &>/dev/null;then
-		echo "Error! --The name ${vmname} is illegal"
+		echo "Error! --The vmname set is illegal"
 		exit 2
 	fi
-
-#check the vmname and vmdisk exists
-	for k in `seq 1 ${nums}`;do
-		vname="${vmname}-${k}"
-		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" &>/dev/null;then
-			echo "Error! --The vm ${vname} already exist!"
-			exit 2
-		fi
-
-		if ls ${vdiskdir}/${vname}.disk &>/dev/null;then
-			echo "Error! --The disk ${vdiskdir}/${vname}.disk already exist!"
-			exit 2
-		fi
-	done
-
-	vdisksize=${vdisksize:-20}
-	vcpu=${vcpu:-1}
-	vmemory=${vmemory:-2}
-	nicnums=${nicnums:-2}
 
 #check the diskdir exist
 	if [ ! -d "${vdiskdir}" ];then
@@ -97,10 +90,30 @@ function argvs_check() {
 	fi
 
 #check the backing file exist	
-	if [ ! -f "${vbacking}" ];then
-		echo "Error! --The backing file ${vbacking} not exist"
+	if [ ! -f "${backing_image}" ];then
+		echo "Error! --The backing file ${backing_image} not exist"
 		exit 5
 	fi
+
+#check whether the disk exist
+	for k in `seq ${startnum} $((startnum+nums-1))`;do
+		vname="${vmname}-${k}"
+		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" &>/dev/null;then
+			echo "Error! --The vm ${vname} already exist!"
+			exit 2
+		fi
+
+		if ls ${vdiskdir}/${vname}.disk &>/dev/null;then
+			echo "The disk ${vdiskdir}/${vname}.disk already exist!"
+			exit 2
+		fi
+	done
+
+	vdisksize=${vdisksize:-20}
+	vcpu=${vcpu:-1}
+	vmemory=${vmemory:-2}
+	nicnums=${nicnums:-2}
+    startnum=${startnum:-1}
 
 #check the interface
 	if ! service libvirtd status &>/dev/null;then
@@ -108,7 +121,7 @@ function argvs_check() {
 		[ $? -ne "0" ] && echo "Error! --Service libvirtd is not running,please install it or start it"
 		exit 4
 	else
-		if brctl show | awk 'NR>1 && /^[^\t ]/{print $1}' | grep "${interface}" &>/dev/null;then
+		if brctl show | awk 'NR>1 && /^[^\t]/{print $1}' | grep "${interface}" &>/dev/null;then
 			ipaddr=$(ifconfig "${interface}" | awk '/inet addr/{print substr($2,6)}')	
 			if ! ping -w 3 "${ipaddr}" &>/dev/null;then
 				echo "Error! --The bridge ${interface} need a ip address"
@@ -128,11 +141,10 @@ function argvs_check() {
 
 #when set the ip addr,Check the following options
 	if [ "${ipalter}" == "y" ];then
-	
 		ipnums=`echo "${vmipaddr}" | awk '{print NF}'`
 		if [ "${ipnums}" -ne "${nums}" ];then
 			echo "Error! --The number of vm are:${nums},but the number of ip are:${ipnums},Both of them must be equal!"
-			exit 7
+			exit 2
 		fi
 
 		if [ "${nettype}" == "dhcp" ];then
@@ -155,7 +167,7 @@ function argvs_check() {
 
 function create_disk() {
 	echo "++++++++"
-	qemu-img create -b "${vbacking}" -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G &>/dev/null
+	qemu-img create -b "${backing_image}" -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G &>/dev/null
 	if [ "$?" -ne "0" ];then
 		echo "create ${vdiskdir}/${vname}.disk OK!"
 		exit 4
@@ -191,7 +203,8 @@ function create_ipaddr() {
 		rm -fr ifcfg-eth0
 		macaddr=`virsh domiflist ${vname} | awk 'NR==3{print $5}'`
 		if [ "${nettype}" == "static" ];then
-			eth0ip=`echo $vmipaddr | awk -v i=${i} '{print $i}'`
+			eth0ip=`echo $vmipaddr | awk -v m=${l} '{print $m}'`
+			l=$((l+1))
 			cat > ifcfg-eth0 <<- EOF
 			DEVICE=eth0
 			HWADDR=${macaddr}
@@ -298,8 +311,10 @@ cat >> ${vdiskdir}/base.xml << 'EOF'
 EOF
 }
 
+#main 
 function main() {
-	for i in `seq 1 ${nums}`;do
+	l=1
+	for i in `seq ${startnum} $((startnum+nums-1))`;do
 		vname="${vmname}-${i}"
 		create_disk
 		set_basexml
@@ -311,8 +326,8 @@ function main() {
 
 #check the user 
 if [ `whoami` != root ]; then
-	echo "Error! --you must login in as root"
-	exit
+    echo "Error! --you must login in as root"
+    exit
 fi
 argvs_check
 main

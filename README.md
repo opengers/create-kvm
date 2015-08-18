@@ -1,9 +1,11 @@
 #centos6.x下批量创建KVM虚拟机脚本
 ##说明
 - 更新日期:2015-8-13
-- 版本:2.0.2
+- 版本:2.0.3
 - 作者:www.isjian.com
 
+- Version 2.0.3 ChangeLog:
+- 自定义虚拟机起始编号，vmhost-n,vmhost-{n+1},...
 - Version 2.0.2 ChangeLOg:
 - --只允许root用户执行此脚本
 - Version 2.0.1 ChangeLog:
