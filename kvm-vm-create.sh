@@ -187,7 +187,7 @@ function create_xml() {
 	[ ! -z ${vcpu} ] && sed -i "s/thisiscpu/${vcpu}/g" ${vname}.xml
 
 	if [ ! -z ${vmemory} ];then
-		vmem=$(python -c "print 1024*1024*${vmemory}")
+		vmem=$(python -c "print int(1024*1024*${vmemory})")
 		sed -i "s/thisismem/${vmem}/g" ${vname}.xml
 	fi
 
