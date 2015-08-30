@@ -5,7 +5,7 @@
 - Author:www.isjian.com
 
 ##ChangeLog:
-- Version 2.1(beta) ChangeLog:
+Version 2.1(beta) ChangeLog:
 - --允许添加另一块数据盘
 - --允许设置虚拟机主机名
 - Version 2.0.3 ChangeLog:
