@@ -8,8 +8,10 @@
 ### Version 2.1(beta) ChangeLog
 - 允许添加另一块数据盘
 - 允许设置虚拟机主机名
+
 ### Version 2.0.3 ChangeLog
 - 自定义虚拟机名称编号，vmhost-n,vmhost-{n+1},...
+
 ### Version 2.0.2 ChangeLog
 - 添加身份检查，只允许root身份执行
 ### Version 2.0.1 ChangeLog
