@@ -281,7 +281,8 @@ function set_vmhostname {
 	cat >> /tmp/network <<- EOF
 	NETWORKING=yes
 	HOSTNAME=${ihostname}
-	EOF
+EOF
+	sed -r -i "s/^( |\t)*//g" /tmp/network
 	virt-copy-in -a ${vdiskdir}/${vname}.disk /tmp/network /etc/sysconfig/
 	if [ $? -eq 0 ];then
 		echo "set the ${vmname} hostname ok"
