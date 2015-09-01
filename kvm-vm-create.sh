@@ -1,11 +1,13 @@
 #!/bin/bash
-#Date:2015-8-30
+#Date:2015-9-1
 #Note:Create the VMs accroding to the settings
-#Version:2.1
+#Version:2.5
 #Author:www.isjian.com
 
 set -e
 #---------------------- ChangeLog -------------------------
+#Version 2.5 ChangeLog:
+#--可以自定义每个虚拟机的详细配置(名字，cpu，内存，hostname，磁盘大小,网卡数,ip地址)
 #Version 2.1 ChangeLog:
 #--允许添加另一块数据盘
 #--允许设置虚拟机主机名
@@ -24,44 +26,42 @@ set -e
 
 #------------------------ argvs ---------------------------
 #虚拟机数量(正整数)
-nums=2
-#虚拟机初始编号,例如初始编号为3,则虚拟命名为vmhost-3,vmhost-4,vmhost-5,默认编号从1开始(正整数)
-startnum=1
+V_nums=3
 #虚拟机名字,该变量只能为(数字，字母下划线的组合)
-vmname="test"
-#虚拟磁盘存放目录(目录路径最后不需要带"/")
-vdiskdir=/data/vhosts/test
-#backing_image设置虚拟机的模板镜像，此项是必要的，请确保此处设置的镜像可用，负责虚拟机会创建失败
-backing_image="/data/images/centos65x64-2.6kernel.qcow2"
-
+V_name="test-1 test-2 test-3"
 #虚拟机CPU数(正整数,默认1)
-vcpu=1
+V_cpu="1 2 1"
 #虚拟机内存(G,默认1)
-vmemory=1
+V_memory="1 1 3"
 #虚拟机根磁盘大小(单位为G),默认为20G
-vdisksize=40
+V_rootsize="30 40 30"
 #数据盘大小,单位为G(留空则不添加)
-vdisk_vdb=""
+V_datasize="20 30 40"
 #虚拟机网卡个数(默认2)
-nicnums="2"
+V_nics="2 2 1"
+#虚拟机主机名，多个主机名之间用空格隔开，主机名个数需和新建的虚拟机数量(nums)保持一致
+V_hostname="test-1 test-2 test-3"
+
 #虚拟机网络配置方式，可以使用nat，或者桥接方式
 #--nat方式: 虚拟机通过nat方式访问外网,virbr0为libvirt自动创建，默认使用192.168.122.0/24这个网段
 #--桥接方式: 要使用桥接方式访问外网,请改为宿主机上的某个网桥,比如br-ex,请确保此网桥可用(支持Linux Bridge,暂不支持OVS)
-interface="br-ex"
-#虚拟机主机名，多个主机名之间用空格隔开，主机名个数需和新建的虚拟机数量(nums)保持一致
-vmhostname="test-1 test-2"
+H_bridge="br-ex"
+#虚拟磁盘存放目录(目录路径最后不需要带"/")
+H_vmdir=/data/vhosts/test
+#backing_image设置虚拟机的模板镜像，此项是必要的，请确保此处设置的镜像可用，负责虚拟机会创建失败
+H_backimage="/data/images/centos65x64-2.6kernel.qcow2"
 
 #是否设置虚拟机ip地址("y" or "n")
-ipalter="y"
+ipalter="n"
 
 #注意：以下变量仅在ipalter设置为"y"时生效
 #############################################
 #虚拟机ip获取方式("dhcp" or "static")
-nettype=static
+V_nettype=static
 #如果nettype使用static方式，则需要设置以下信息,ip地址数必须与创建的虚拟机个数匹配,中间须用空格隔开
-vmipaddr="172.16.12.61 172.16.12.62"
-vmnetmask="255.255.255.0"
-vmgateway="172.16.12.254"
+V_ip="172.16.12.62 172.16.12.63"
+V_netmask="255.255.255.0"
+V_gateway="172.16.12.254"
 #############################################
 
 #------------------- function -----------------------------
@@ -70,81 +70,93 @@ function argvs_check() {
    		echo "Error! --you must login in as root"
    		exit
 	fi
-	
-	nums=${nums:-1}
-	vdisksize=${vdisksize:-20}
-	vcpu=${vcpu:-1}
-	vmemory=${vmemory:-2}
-	nicnums=${nicnums:-2}
-    startnum=${startnum:-1}
 
-#check the var
-	for inum in "${nums}" "${startnum}" "${vdisksize}" "${vcpu}" "${vmemory}" "${nicnums}"
+	if ! test "${V_nums}" -ge 1 2>/dev/null;then
+		echo "Error! --The ${V_nums} is illegal!"
+		exit 3
+	fi
+
+#must be three argvs
+	m=0
+	for i in "${V_name}" "${V_cpu}" "${V_memory}" "${V_rootsize}" "${V_hostname}" "${V_nics}" "${V_datasize}" "${V_ip}"
 	do
-		if ! test "${inum}" -ge 1 2>/dev/null;then
-			echo "Error! --The ${inum} set error!"
-			exit 3
+		m=$((m+1))
+		if [ ${m} -eq 7 ];then
+			[ -z "${i}" ] && continue
+		fi
+		
+		if [ ${m} -eq 8 ];then
+			if [ ${ipalter} != "y" ] || [ "${V_nettype}" != "static" ];then
+				continue
+			fi
+		fi
+
+		i_nums=`echo "${i}" | awk '{print NF}'`
+		if [ "${i_nums}" -ne "${V_nums}" ];then
+			echo "Error! --The number of [ ${i} ] is not equal to ${V_nums}"
+			exit 4
+		fi
+
+		if echo "$m" | grep -E "(2|3|4|6|7)" &>/dev/null;then
+			for j in ${i};do
+				if ! test "${j}" -ge 1 2>/dev/null;then
+					echo "Error! --The ${j} is illegal!"
+					exit 3
+				fi
+			done
+		fi
+
+		if echo "$m" | grep -E "(1|5)" &>/dev/null;then
+			for k in ${i};do
+				if ! echo "${k}" | grep -E "^(\w|-)+$" &>/dev/null;then
+					echo "Error! --The var:${k} is illegal"
+					exit 2
+				fi
+			done
 		fi
 	done
 
-#check the var vdisk_vdb
-	if [ ! -z ${vdisk_vdb} ];then
-		if ! test "${vdisk_vdb}" -ge 1 2>/dev/null;then
-			echo "Error! --The startnum set error!"
-			exit 3
-		fi
-	fi
-
-#check the virsh command 
-	if ! which virsh &>/dev/null;then
-		echo "Error! --the libvirt is not install,please install it via:yum install libvirt-client libvirt"
-		exit 2
-	fi
-
-#check the vmname 
-	if ! echo "${vmname}" | grep -E "^\w+$" &>/dev/null;then
-		echo "Error! --The vmname set is illegal"
-		exit 2
-	fi
-
 #check the diskdir exist
-	if [ ! -d "${vdiskdir}" ];then
-		echo "Error! --The dir ${vdiskdir} is not exist"
+	if [ ! -d "${H_vmdir}" ];then
+		echo "Error! --The dir ${H_vmdir} is not exist"
 		exit 4
 	fi
 
 #check the backing file exist	
-	if [ ! -f "${backing_image}" ];then
-		echo "Error! --The backing file ${backing_image} not exist"
+	if [ ! -f "${H_backimage}" ];then
+		echo "Error! --The backing file ${H_backimage} not exist"
 		exit 5
 	fi
 
 #check whether the disk exist
-	for k in `seq ${startnum} $((startnum+nums-1))`;do
-		vname="${vmname}-${k}"
-		if virsh -q list --all | awk '{print $2}' | grep -w "${vname}" &>/dev/null;then
-			echo "Error! --The vm ${vname} already exist!"
+    for l in `seq 1 ${V_nums}`;do
+        v_name_tmp=`echo "${V_name}" | awk -v m=${l} '{print $m}'`
+		if virsh -q list --all | awk '{print $2}' | grep -w "${v_name_tmp}" &>/dev/null;then
+			echo "Error! --The vm ${v_name_tmp} already exist!"
 			exit 2
 		fi
 
-		if ls ${vdiskdir}/${vname}.disk &>/dev/null;then
-			echo "The disk ${vdiskdir}/${vname}.disk already exist!"
+		if ls ${H_vmdir}/${v_name_tmp}.disk &>/dev/null;then
+			echo "The disk ${H_vmdir}/${v_name_tmp}.disk already exist!"
 			exit 2
 		fi
 
-		if [ ! -z "${vdisk_vdb}" ];then
-	        if ls ${vdiskdir}/${vname}-data1.disk &>/dev/null;then
-   	        	echo "The disk ${vdiskdir}/${vname}-data1.disk already exist!"
+		if [ ! -z "${V_datasize}" ];then
+	        if ls ${H_vmdir}/${v_name_tmp}-data1.disk &>/dev/null;then
+   	        	echo "The disk ${H_vmdir}/${v_name_tmp}-data1.disk already exist!"
    		    	exit 2
         	fi	
 		fi
 	done
 
-#check the vmhostname
-	hostnamenums=`echo "${vmhostname}" | awk '{print NF}'`
-	if [ "${hostnamenums}" -ne "${nums}" ];then
-		echo "Error! --The number of vm are:${nums},but the number of hostname are:${hostnamenums},Both of them must be equal!"
-		exit 4
+#check the virsh cmd
+	if ! which virsh &>/dev/null;then
+		echo "Error! --the libvirt is not install,please install it via:yum install libvirt-client libvirt"
+		exit 2
+	fi
+	if ! which "virt-copy-in" &>/dev/null;then
+		echo "Error! --The virt-copy-in tools not install,please install via 'yum install libguestfs libguestfs-tools-c'"
+		exit 8
 	fi
 
 #check the interface
@@ -153,113 +165,105 @@ function argvs_check() {
 		[ $? -ne "0" ] && echo "Error! --Service libvirtd is not running,please install it or start it"
 		exit 4
 	else
-		if brctl show | awk 'NR>1 && /^[^\t]/{print $1}' | grep "${interface}" &>/dev/null;then
-			ipaddr=$(ifconfig "${interface}" | awk '/inet addr/{print substr($2,6)}')	
+		if brctl show | awk 'NR>1 && /^[^\t]/{print $1}' | grep "${H_bridge}" &>/dev/null;then
+			ipaddr=$(ifconfig "${H_bridge}" | awk '/inet addr/{print substr($2,6)}')	
 			if ! ping -w 3 "${ipaddr}" &>/dev/null;then
-				echo "Error! --The bridge ${interface} need a ip address"
+				echo "Error! --The bridge ${H_bridge} need a ip address"
 				exit 6
 			fi
 		else
-			echo "Error! --The ${interface} is not a bridge"
+			echo "Error! --The ${H_bridge} is not a bridge"
 			exit
 		fi
 	fi
 
-#check the vmipaddr
-	if [ "${ipalter}" != "y" ] && [ "${ipalter}" != "n" ];then
-		echo "Error! --Set the variable ipalter to 'y' or 'n'"
-		exit 2
-	fi
-
 #when set the ip addr,Check the following options
 	if [ "${ipalter}" == "y" ];then
-		ipnums=`echo "${vmipaddr}" | awk '{print NF}'`
-		if [ "${ipnums}" -ne "${nums}" ];then
-			echo "Error! --The number of vm are:${nums},but the number of ip are:${ipnums},Both of them must be equal!"
-			exit 2
-		fi
-
-		if [ "${nettype}" == "dhcp" ];then
+		if [ "${V_nettype}" == "dhcp" ];then
 			echo "dhcp set ok"
-		elif [ "${nettype}" == "static" ];then
-			[ -z "${vmipaddr}" ] && echo "Error! --you must set the vm ip address!" && exit 2
-			[ -z "${vmnetmask}" ] && echo "Error! --you must set the vm netmask!" && exit 2
-			[ -z "${vmgateway}" ] && echo "Error! --you must set the vm gateway!" && exit 2
+		elif [ "${V_nettype}" == "static" ];then
+			v_ip_tmp=`echo "${V_ip}" | awk '{print NF}'`
+        	if [ "${v_ip_tmp}" -ne "${V_nums}" ];then
+            	echo "Error! --The number of ${v_ip_tmp} is not equal to ${V_nums}"
+            	exit 4
+        	fi
+			[ -z "${V_netmask}" ] && echo "Error! --you must set the vm netmask!" && exit 2
+			[ -z "${V_gateway}" ] && echo "Error! --you must set the vm gateway!" && exit 2
 		else
 			echo "Error! --set the variable nettype to 'dhcp' or 'static'"
 			exit 6
 		fi
 
-		if ! which "virt-copy-in" &>/dev/null;then
-			echo "Error! --The virt-copy-in tools not install,please install via 'yum install libguestfs libguestfs-tools-c'"
-			exit 8
-		fi
+	elif [ "${ipalter}" == "n" ];then
+		echo "won't set the vm ips..."
+	else
+		echo "Error! --Set the variable ipalter to 'y' or 'n'"
+		exit 2
 	fi
 }
 
 function create_disk() {
 	echo "++++++++"
-	qemu-img create -b "${backing_image}" -f qcow2 "${vdiskdir}/${vname}.disk" "${vdisksize}"G &>/dev/null
+	qemu-img create -b "${H_backimage}" -f qcow2 "${H_vmdir}/${v_name}.disk" "${v_rootsize}"G &>/dev/null
 	if [ "$?" -ne "0" ];then
-		echo "Error! --can't create ${vdiskdir}/${vname}.disk"
+		echo "Error! --can't create rootdisk ${H_vmdir}/${v_name}.disk"
 		exit 4
 	fi 
-	echo "create ${vdiskdir}/${vname}.disk OK!"
+	echo "create rootdisk ${H_vmdir}/${v_name}.disk ok!"
 
-	if [ ! -z ${vdisk_vdb} ];then
-		qemu-img create -f qcow2 "${vdiskdir}/${vname}-data1.disk" "${vdisk_vdb}"G &>/dev/null
+	if [ ! -z "${V_datasize}" ];then
+		qemu-img create -f qcow2 "${H_vmdir}/${v_name}-data1.disk" "${v_datasize}"G &>/dev/null
 		if [ "$?" -ne "0" ];then
-        	echo "Error! --can't create ${vdiskdir}/${vname}-data1.disk"
+        	echo "Error! --can't create datadisk ${H_vmdir}/${v_name}-data1.disk"
         	exit 4
     	fi 
-    	echo "create datadisk ${vdiskdir}/${vname}-data1.disk OK!"
+    	echo "create datadisk ${H_vmdir}/${v_name}-data1.disk ok!"
 	fi
 }	
 
 function create_xml() {
 	#create the xml file
-	\cp -rf ${vdiskdir}/base.xml ${vdiskdir}/${vname}.xml
-	cd ${vdiskdir}
-	sed -i "s/thisisname/${vname}/g" ${vname}.xml
-	allname_tmp="${vdiskdir}/${vname}"
-	allname="$(echo $allname_tmp | sed -r 's/\//\\\//g')"
-	sed -i "s/thisisdiskname/${allname}\.disk/g" ${vname}.xml
-	sed -i "s/thisisdatadiskname/${allname}-data1\.disk/g" ${vname}.xml
+	\cp -f ${H_vmdir}/base.xml ${H_vmdir}/${v_name}.xml
+	cd ${H_vmdir}
+	sed -i "s/thisisname/${v_name}/g" ${v_name}.xml
+	allname_tmp="${H_vmdir}/${v_name}"
+	allname="$(echo ${allname_tmp} | sed -r 's/\//\\\//g')"
+	sed -i "s/thisisdiskname/${allname}\.disk/g" ${v_name}.xml
+	sed -i "s/thisisdatadiskname/${allname}-data1\.disk/g" ${v_name}.xml
 
-	sed -i "s/thisiscpu/${vcpu}/g" ${vname}.xml
+	sed -i "s/thisiscpu/${v_cpu}/g" ${v_name}.xml
 
-	vmem=$(python -c "print int(1024*1024*${vmemory})")
-	sed -i "s/thisismem/${vmem}/g" ${vname}.xml
+	vmem=$(python -c "print int(1024*1024*${v_memory})")
+	sed -i "s/thisismem/${vmem}/g" ${v_name}.xml
 
-	sed -i "s/thisisnetwork/${interface}/g" ${vname}.xml
+	sed -i "s/thisisnetwork/${H_bridge}/g" ${v_name}.xml
 
-	virsh define ${vname}.xml &>/dev/null && echo "define ${vname} OK!" || echo "Error! --can't define ${vname}"
+	virsh define ${v_name}.xml &>/dev/null && echo "define ${v_name} ok!" || echo "Error! --can't define ${v_name}"
 }
 
 function create_ipaddr() {
 	if [ "${ipalter}" == "y" ];then
-		echo "Set the ${vname} ip address..."
-		\rm -fr /tmp/ifcfg-eth0
-		macaddr=`virsh domiflist ${vname} | awk 'NR==3{print $5}'`
-		if [ "${nettype}" == "static" ];then
-			eth0ip=`echo "$vmipaddr" | awk -v m=${l} '{print $m}'`
+		echo "Set the ${v_name} ip address..."
+		\rm -f /tmp/ifcfg-eth0
+		v_mac=`virsh domiflist ${v_name} | awk 'NR==3{print $5}'`
+		if [ "${V_nettype}" == "static" ];then
 			cat > /tmp/ifcfg-eth0 <<- EOF
 			DEVICE=eth0
-			HWADDR=${macaddr}
+			HWADDR=${v_mac}
 			TYPE=Ethernet
 			ONBOOT=yes
 			NM_CONTROLLED=no
 			BOOTPROTO=static
-			IPADDR=${eth0ip}
-			NETMASK=${vmnetmask}
-			GATEWAY=${vmgateway}
+			IPADDR=${v_ip}
+			NETMASK=${V_netmask}
+			GATEWAY=${V_gateway}
 			DNS1=223.5.5.5
 			DNS2=223.6.6.6
 			EOF
-		elif [ "${nettype}" == "dhcp" ];then
+		elif [ "${V_nettype}" == "dhcp" ];then
 			cat > /tmp/ifcfg-eth0 <<- EOF
 			DEVICE=eth0
-			HWADDR=${macaddr}
+			HWADDR=${v_mac}
 			TYPE=Ethernet
 			ONBOOT=yes
 			NM_CONTROLLED=no
@@ -268,37 +272,35 @@ function create_ipaddr() {
 		fi
 
 		sed -r -i "s/^( |\t)*//g" /tmp/ifcfg-eth0
-		virt-copy-in -a ${vdiskdir}/${vname}.disk /tmp/ifcfg-eth0 /etc/sysconfig/network-scripts/
-		echo "Set the ${vname} ip address OK!"
+		virt-copy-in -a ${H_vmdir}/${v_name}.disk /tmp/ifcfg-eth0 /etc/sysconfig/network-scripts/
+		echo "Set the ${v_name} ip address OK!"
 		\rm -f /tmp/ifcfg-eth0
 	fi
 }
 
 function set_vmhostname {
-	echo "set the ${vmname} hostname..."
-	ihostname=`echo "${vmhostname}" | awk -v m=${l} '{print $m}'`
 	\rm -f /tmp/network
 	cat >> /tmp/network <<- EOF
 	NETWORKING=yes
-	HOSTNAME=${ihostname}
+	HOSTNAME=${v_hostname}
 EOF
 	sed -r -i "s/^( |\t)*//g" /tmp/network
-	virt-copy-in -a ${vdiskdir}/${vname}.disk /tmp/network /etc/sysconfig/
+	virt-copy-in -a ${H_vmdir}/${v_name}.disk /tmp/network /etc/sysconfig/
 	if [ $? -eq 0 ];then
-		echo "set the ${vmname} hostname ok"
+		echo "set the ${v_name} hostname ok"
 	else
-		echo "Error! --can't set the ${vmname} hostname"
+		echo "Error! --can't set the ${v_name} hostname"
 		exit 3
 	fi
 }
 
-function start_domin() {
-	virsh start ${vname}
+function start_vm() {
+	virsh start ${v_name}
 }
 
 function set_basexml() {
-\rm -f ${vdiskdir}/base.xml
-cat >> ${vdiskdir}/base.xml << 'EOF'
+\rm -f ${H_vmdir}/base.xml
+cat >> ${H_vmdir}/base.xml << 'EOF'
 <domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
   <name>thisisname</name>
   <memory unit='KiB'>thisismem</memory>
@@ -332,8 +334,8 @@ cat >> ${vdiskdir}/base.xml << 'EOF'
     </disk>
 EOF
 
-if [ ! -z ${vdisk_vdb} ];then
-	cat >> ${vdiskdir}/base.xml << 'EOF'
+if [ ! -z "${V_datasize}" ];then
+	cat >> ${H_vmdir}/base.xml << 'EOF'
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='none'/>
       <source file='thisisdatadiskname'/>
@@ -342,7 +344,7 @@ if [ ! -z ${vdisk_vdb} ];then
 EOF
 fi
 
-cat >> ${vdiskdir}/base.xml << 'EOF'
+cat >> ${H_vmdir}/base.xml << 'EOF'
     <controller type='ide' index='0'>
     </controller>
     <controller type='virtio-serial' index='0'>
@@ -351,8 +353,8 @@ cat >> ${vdiskdir}/base.xml << 'EOF'
     </controller>
 EOF
 
-for j in `seq 1 ${nicnums}`;do
-cat >> ${vdiskdir}/base.xml << 'EOF'
+for j in `seq 1 ${v_nics}`;do
+cat >> ${H_vmdir}/base.xml << 'EOF'
     <interface type='bridge'>
       <source bridge='thisisnetwork'/>
       <model type='virtio'/>
@@ -360,7 +362,7 @@ cat >> ${vdiskdir}/base.xml << 'EOF'
 EOF
 done
 
-cat >> ${vdiskdir}/base.xml << 'EOF'
+cat >> ${H_vmdir}/base.xml << 'EOF'
     <console type='pty'>
     </console>
     <input type='mouse' bus='ps2'/>
@@ -382,18 +384,22 @@ EOF
 
 #main 
 function main() {
-	l=1
-	for i in `seq ${startnum} $((startnum+nums-1))`;do
-		vname="${vmname}-${i}"
+	for i in `seq 1 ${V_nums}`;do
+		v_name=`echo "${V_name}" | awk -v m=${i} '{print $m}'`
+		v_cpu=`echo "${V_cpu}" | awk -v m=${i} '{print $m}'`
+		v_memory=`echo "${V_memory}" | awk -v m=${i} '{print $m}'`
+		v_rootsize=`echo "${V_rootsize}" | awk -v m=${i} '{print $m}'`
+		v_datasize=`echo "${V_datasize}" | awk -v m=${i} '{print $m}'`
+		v_nics=`echo "${V_nics}" | awk -v m=${i} '{print $m}'`
+		v_hostname=`echo "${V_hostname}" | awk -v m=${i} '{print $m}'`
+		v_ip=`echo "${V_ip}" | awk -v m=${i} '{print $m}'`
 		create_disk
 		set_basexml
 		create_xml
 		create_ipaddr
 		set_vmhostname
-		start_domin
-		l=$((l+1))
+		start_vm
 	done
-	unset l
 }
 
 argvs_check
