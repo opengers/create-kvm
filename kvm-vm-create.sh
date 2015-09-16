@@ -3,6 +3,7 @@
 #Note:Create the VMs accroding to the settings
 #Version:2.5
 #Author:www.isjian.com
+#Copyright
 
 set -e
 #---------------------- ChangeLog -------------------------
@@ -24,6 +25,7 @@ set -e
 #--Add the variables check before create the vms
 #--Set the vms ip before create the vms
 
+
 #------------------------ argvs ---------------------------
 #虚拟机数量(正整数)
 V_nums=3
@@ -35,8 +37,13 @@ V_cpu="1 2 1"
 V_memory="1 1 3"
 #虚拟机根磁盘大小(单位为G),默认为20G
 V_rootsize="30 40 30"
-#数据盘大小,单位为G(留空则不添加)
-V_datasize="20 30 40"
+
+#要创建的数据盘大小,单位为G
+#如果不需要数据盘，则设置此变量为空，如V_datasize=""
+#若只是其中某个虚机不需要数据盘，则在其相应位置上用"-"表示
+#如V_datasize="20 - 30",表示第二台虚机(test-2)不创建数据盘
+V_datasize="20 - 40"
+
 #虚拟机网卡个数(默认2)
 V_nics="2 2 1"
 #虚拟机主机名，多个主机名之间用空格隔开，主机名个数需和新建的虚拟机数量(nums)保持一致
@@ -52,7 +59,7 @@ H_vmdir=/data/vhosts/test
 H_backimage="/data/images/centos65x64-2.6kernel.qcow2"
 
 #是否设置虚拟机ip地址("y" or "n")
-ipalter="n"
+ipalter="y"
 
 #注意：以下变量仅在ipalter设置为"y"时生效
 #############################################
@@ -99,6 +106,9 @@ function argvs_check() {
 
 		if echo "$m" | grep -E "(2|3|4|6|7)" &>/dev/null;then
 			for j in ${i};do
+				if [ "$m" -eq 7 ] && [ "${j}" == "-" ];then
+					continue
+				fi
 				if ! test "${j}" -ge 1 2>/dev/null;then
 					echo "Error! --The ${j} is illegal!"
 					exit 3
@@ -211,7 +221,7 @@ function create_disk() {
 	fi 
 	echo "create rootdisk ${H_vmdir}/${v_name}.disk ok!"
 
-	if [ ! -z "${V_datasize}" ];then
+	if [ ! -z "${V_datasize}" ] && [ "${v_datasize}" != "-" ];then
 		qemu-img create -f qcow2 "${H_vmdir}/${v_name}-data1.disk" "${v_datasize}"G &>/dev/null
 		if [ "$?" -ne "0" ];then
         	echo "Error! --can't create datadisk ${H_vmdir}/${v_name}-data1.disk"
@@ -334,7 +344,7 @@ cat >> ${H_vmdir}/base.xml << 'EOF'
     </disk>
 EOF
 
-if [ ! -z "${V_datasize}" ];then
+if [ ! -z "${V_datasize}" ] && [ "${v_datasize}" != "-" ];then
 	cat >> ${H_vmdir}/base.xml << 'EOF'
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='none'/>
