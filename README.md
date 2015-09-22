@@ -1,10 +1,13 @@
 ##About
-- 更新日期:2015-8-30
+- 更新日期:2015-9-22
 - 简介:Create the VMs accroding to the settings
-- 最新版本:2.1
+- 最新版本:2.5.1
 - 作者:www.isjian.com
 
 ##ChangeLog
+### Version 2.5.1 ChangeLog
+1. 可以自定义每个虚拟机的详细配置(名字，cpu，内存，hostname，磁盘大小,网卡数,ip地址)
+
 ### Version 2.1 ChangeLog
 1. 允许添加另一块数据盘
 2. 允许设置虚拟机主机名

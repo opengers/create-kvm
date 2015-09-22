@@ -33,9 +33,9 @@ V_nums=3
 #该变量只能为数字，字母下划线的组合
 V_name="test-1 test-2 test-3"
 #虚拟机CPU个数,多个值之间用空格隔开(正整数)
-V_cpu="1 2 3"
+V_cpu="1 2 1"
 #虚拟机内存大小(单位为G),多个值之间用空格隔开
-V_memory="1 2 3"
+V_memory="1 2 1"
 #虚拟机根磁盘大小(正整数，单位为G)
 V_rootsize="30 40 50"
 
@@ -73,10 +73,12 @@ ipalter="y"
 #############################################
 #虚拟机ip获取方式("dhcp" or "static")
 V_nettype=static
-#如果nettype使用static方式，则需要设置以下信息,ip地址数必须与创建的虚拟机个数匹配,中间须用空格隔开
-V_ip="172.16.12.62 172.16.12.63"
+#如果nettype使用static方式，则需要设置以下信息,
+#ip地址数必须与创建的虚拟机个数匹配,中间用空格隔开
+V_ip="172.16.12.63 172.16.12.64 172.16.12.65"
 V_netmask="255.255.255.0"
 V_gateway="172.16.12.254"
+#注意:多个虚机的netmask和gateway是相同的
 #############################################
 
 #------------------- function -----------------------------
@@ -205,13 +207,20 @@ function argvs_check() {
             	echo "Error! --The number of ${v_ip_tmp} is not equal to ${V_nums}"
             	exit 4
         	fi
-			[ -z "${V_netmask}" ] && echo "Error! --you must set the vm netmask!" && exit 2
-			[ -z "${V_gateway}" ] && echo "Error! --you must set the vm gateway!" && exit 2
+
+			if ! ping -w 3 "${V_gateway}" &>/dev/null;then
+                echo "Error! --The gateway:${V_gateway} not access"
+                exit 3
+            fi
+
+            if [ -z "${V_netmask}" ];then
+                echo "Error! --you must set the vm netmask!"
+                exit 3
+            fi
 		else
 			echo "Error! --set the variable nettype to 'dhcp' or 'static'"
 			exit 6
 		fi
-
 	elif [ "${ipalter}" == "n" ];then
 		echo "won't set the vm ips..."
 	else
