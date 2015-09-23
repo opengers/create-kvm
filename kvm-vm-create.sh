@@ -1,9 +1,8 @@
 #!/bin/bash
-#Changedate:2015-9-22
-#Note:Create the VMs accroding to the settings
+#ChangeDate:2015-9-22
+#Comment:Create multiple VMs accroding to the argvs
 #Version:2.5.1
 #Author:www.isjian.com
-#Copyright
 
 set -e
 #---------------------- ChangeLog -------------------------
@@ -26,7 +25,7 @@ set -e
 #--Set the vms ip before create the vms
 
 
-#------------------------ argvs ---------------------------
+#----------------------- argvs ---------------------------
 #虚拟机个数(正整数)
 V_nums=3
 #虚拟机名字,多个虚拟机之间用空格隔开
@@ -81,7 +80,7 @@ V_gateway="172.16.12.254"
 #注意:多个虚机的netmask和gateway是相同的
 #############################################
 
-#------------------- function -----------------------------
+#------------------- function ---------------------------
 function argvs_check() {
 	if [ `whoami` != root ]; then
    		echo "Error! --you must login in as root"
@@ -92,7 +91,6 @@ function argvs_check() {
 		echo "Error! --The ${V_nums} is illegal!"
 		exit 3
 	fi
-
 #must be three argvs
 	m=0
 	for i in "${V_name}" "${V_cpu}" "${V_memory}" "${V_rootsize}" "${V_hostname}" "${V_nics}" "${V_datasize}" "${V_ip}"
@@ -101,19 +99,16 @@ function argvs_check() {
 		if [ ${m} -eq 7 ];then
 			[ -z "${i}" ] && continue
 		fi
-		
 		if [ ${m} -eq 8 ];then
 			if [ ${ipalter} != "y" ] || [ "${V_nettype}" != "static" ];then
 				continue
 			fi
 		fi
-
 		i_nums=`echo "${i}" | awk '{print NF}'`
 		if [ "${i_nums}" -ne "${V_nums}" ];then
 			echo "Error! --The number of [ ${i} ] is not equal to ${V_nums}"
 			exit 4
 		fi
-
 		if echo "$m" | grep -E "(2|3|4|6|7)" &>/dev/null;then
 			for j in ${i};do
 				if [ "$m" -eq 7 ] && [ "${j}" == "-" ];then
@@ -125,7 +120,6 @@ function argvs_check() {
 				fi
 			done
 		fi
-
 		if echo "$m" | grep -E "(1|5)" &>/dev/null;then
 			for k in ${i};do
 				if ! echo "${k}" | grep -E "^(\w|-)+$" &>/dev/null;then
@@ -155,12 +149,10 @@ function argvs_check() {
 			echo "Error! --The vm ${v_name_tmp} already exist!"
 			exit 2
 		fi
-
 		if ls ${H_vmdir}/${v_name_tmp}.disk &>/dev/null;then
 			echo "The disk ${H_vmdir}/${v_name_tmp}.disk already exist!"
 			exit 2
 		fi
-
 		if [ ! -z "${V_datasize}" ];then
 	        if ls ${H_vmdir}/${v_name_tmp}-data1.disk &>/dev/null;then
    	        	echo "The disk ${H_vmdir}/${v_name_tmp}-data1.disk already exist!"
@@ -207,12 +199,10 @@ function argvs_check() {
             	echo "Error! --The number of ${v_ip_tmp} is not equal to ${V_nums}"
             	exit 4
         	fi
-
 			if ! ping -w 3 "${V_gateway}" &>/dev/null;then
                 echo "Error! --The gateway:${V_gateway} not access"
                 exit 3
             fi
-
             if [ -z "${V_netmask}" ];then
                 echo "Error! --you must set the vm netmask!"
                 exit 3
