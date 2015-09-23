@@ -34,7 +34,7 @@
 3. 脚本会检查当前系统环境是否符合要求，请根据报错信息定位错误原因
 4. 此脚本所创建的虚机是根据母镜像创建的，创建的每个虚机都是母镜像的一份克隆(链接克隆，并不是完整的拷贝，要了解更多信息，请搜索qcow2格式特性)，因此创建的多个虚机系统将会与母镜像系统保持一致
 5. 一旦创建了虚机，此母镜便被设为只读模式，虚机在有需要时会读母镜像，任何对母镜像的修改或路径变更将导致虚机启动异常，关于更多信息，请参考:http://www.isjian.com/2015/07/kvm-libvirt-qemu-3/
-6. 要获得centos6母镜像，请访问http://cloud.centos.org/centos/6/images/，其它Linux发行版镜像，请参考:http://docs.openstack.org/image-guide/content/ch_obtaining_images.html
+6. 要获得centos6母镜像，请访问:http://cloud.centos.org/centos/6/images/，其它Linux发行版镜像，请参考:http://docs.openstack.org/image-guide/content/ch_obtaining_images.html
 7. 脚本创建的虚机磁盘格式都为qcow2，在脚本中设置H_backimage变量为母镜像路径，请注意该母镜像需要是一个可正常启动的母镜像
 8. 创建kvm虚拟机需要使用libvirt，设置虚机ip，hostname需要使用libguestfish工具
 9. 虚机网络默认使用nat方式(即虚机网卡桥接virbr0网桥，该网桥在启动libvirtd服务后会自动生成)，如果需要修改为Linux Bridge(与宿主机同一个网段)方式，请确保宿主机中有可用的网桥，然后设置H_bridge变量为该网桥名称
